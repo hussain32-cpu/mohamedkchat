@@ -1,99 +1,24 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>WhatsApp Pro + Voice</title>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-
-<style>
-:root { --primary: #075e54; --accent: #25d366; --bg: #e5ddd5; --me: #dcf8c6; --other: #fff; --read: #34b7f1; }
-body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
-
-.header { background: var(--primary); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 55px; z-index: 10; }
-.header-right { display: flex; align-items: center; gap: 12px; }
-
-#chat { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); }
-
-.msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; position: relative; font-size: 15px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
-.msg.me { align-self: flex-start; background: var(--me); border-top-right-radius: 2px; }
-.msg.other { align-self: flex-end; background: var(--other); border-top-left-radius: 2px; }
-
-.time { font-size: 10px; color: #888; display: flex; justify-content: flex-end; align-items: center; gap: 3px; margin-top: 4px; }
-.read-tick { color: #888; font-size: 14px; }
-.is-read { color: var(--read); }
-
-/* الفوتر وتنسيق التسجيل */
-.footer { background: #f0f0f0; padding: 10px; position: relative; }
-.footer-main { display: flex; gap: 8px; align-items: center; }
-.input-box { flex: 1; background: white; border-radius: 25px; display: flex; padding: 5px 15px; align-items: center; border: 1px solid #ddd; }
-.input-box input { border: none; outline: none; flex: 1; padding: 8px; font-size: 16px; }
-.btn-action { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-
-/* لوحة المعاينة قبل الإرسال */
-#voicePreview { display: none; background: #fff; border-radius: 25px; padding: 5px 15px; align-items: center; gap: 10px; flex: 1; border: 1px solid var(--accent); }
-#voicePreview audio { height: 30px; flex: 1; }
-
-.recording-blink { color: red; animation: blink 1s infinite; font-weight: bold; margin-right: 10px; }
-@keyframes blink { 50% { opacity: 0; } }
-
-/* نافذة الاتصال */
-#callOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(7, 94, 84, 0.95); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
-.btn-hangup { background: #ff3b30; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-size: 18px; cursor: pointer; margin-top: 50px; }
-
-audio.msg-audio { width: 100%; max-width: 250px; margin-top: 5px; }
-img.msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
-</style>
-</head>
-<body id="appBody">
-
-<audio id="sendSound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
-<audio id="receiveSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
-<audio id="ringtone" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
-
-<div id="callOverlay">
-    <div style="font-size: 60px; margin-bottom: 20px;">📞</div>
-    <h2 id="callerName">...</h2>
-    <p>اتصال وارد</p>
-    <button class="btn-hangup" onclick="stopRinging()">إغلاق</button>
-</div>
-
-<div class="header">
-    <div class="header-right">
-        <span onclick="changeName()" style="cursor:pointer; font-weight:bold;">👤 <span id="userLabel">...</span></span>
-    </div>
-    <div style="display:flex; align-items:center; gap:18px;">
-        <span onclick="startCall()" style="cursor:pointer; font-size: 20px;">📞</span>
-        <span class="ghost-btn" onclick="enterAdmin()" style="cursor:pointer; font-size: 20px;">👻</span>
-        <button style="background:none; border:none; color:white; font-size: 18px;" onclick="clearLocal()">🗑️</button>
-    </div>
-</div>
-
-<div id="chat"></div>
-
 <div class="footer">
     <div class="footer-main">
         <div id="normalInput" class="input-box" style="display: flex;">
-            <input id="msgInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter') sendMsg()">
+            <input id="msgInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter') sendTextOnly()">
             <label for="imgUpload" style="cursor:pointer; font-size: 20px; margin-right: 10px;">🖼️</label>
             <input type="file" id="imgUpload" hidden accept="image/*">
         </div>
 
-        <div id="voicePreview">
-            <span class="recording-blink" id="recStatus">●</span>
-            <audio id="audioPreview" controls></audio>
+        <div id="voicePreview" style="display: none; background: #fff; border-radius: 25px; padding: 5px 15px; align-items: center; gap: 10px; flex: 1; border: 1px solid #25d366;">
+            <span class="recording-blink" id="recStatus" style="color:red">● تسجيل</span>
+            <audio id="audioPreview" controls style="height: 30px; flex: 1;"></audio>
             <button onclick="cancelVoice()" style="background:none; border:none; color:red; font-size: 18px;">🗑️</button>
         </div>
 
-        <button id="sendBtn" class="btn-action" onclick="sendMsg()">➤</button>
+        <button id="sendBtn" class="btn-action" onclick="handleSend()">➤</button>
         <button id="micBtn" class="btn-action" onclick="toggleRecording()">🎙️</button>
     </div>
 </div>
 
 <script>
+// نفس كود الفايربيس الخاص بك ضعه هنا (Config)
 const firebaseConfig = {
   apiKey: "AIzaSyC3T6PvAihbgMFvxsW4eC1WYwhQ_33tAJw",
   authDomain: "chat-bcdc8.firebaseapp.com",
@@ -105,148 +30,103 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 
 let myName = localStorage.getItem("chatName") || "مستخدم";
-let isInitialLoad = true;
 let mediaRecorder;
 let audioChunks = [];
-let audioBlob;
+let audioBlob = null;
 let isRecording = false;
 
-document.getElementById("userLabel").innerText = myName;
+// وظيفة الإرسال الذكية
+async function handleSend() {
+    // 1. إذا فيه صوت بانتظار الإرسال
+    if (audioBlob) {
+        await sendVoice();
+        return;
+    }
+    // 2. إذا ما فيه صوت، أرسل النص
+    sendTextOnly();
+}
 
-// --- نظام التسجيل الصوتي ---
+async function sendTextOnly() {
+    const input = document.getElementById("msgInput");
+    if(!input.value.trim()) return;
+    
+    try {
+        await db.collection("chat").add({
+            name: myName,
+            text: input.value,
+            time: Date.now(),
+            readBy: []
+        });
+        document.getElementById("sendSound").play().catch(e => {});
+        input.value = "";
+    } catch (e) { alert("خطأ في الإرسال: " + e.message); }
+}
+
 async function toggleRecording() {
     if (!isRecording) {
-        // بدء التسجيل
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            document.getElementById("audioPreview").src = audioUrl;
-            document.getElementById("recStatus").innerText = "معاينة";
-            document.getElementById("recStatus").classList.remove("recording-blink");
-        };
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
+                document.getElementById("audioPreview").src = URL.createObjectURL(audioBlob);
+                document.getElementById("recStatus").innerText = "جاهز";
+                document.getElementById("recStatus").classList.remove("recording-blink");
+            };
 
-        mediaRecorder.start();
-        isRecording = true;
-        document.getElementById("normalInput").style.display = "none";
-        document.getElementById("sendBtn").style.display = "none";
-        document.getElementById("voicePreview").style.display = "flex";
-        document.getElementById("micBtn").innerHTML = "⏹️"; // زر الإيقاف
-        document.getElementById("recStatus").innerText = "تسجيل...";
-        document.getElementById("recStatus").classList.add("recording-blink");
+            mediaRecorder.start();
+            isRecording = true;
+            document.getElementById("normalInput").style.display = "none";
+            document.getElementById("voicePreview").style.display = "flex";
+            document.getElementById("micBtn").innerHTML = "⏹️";
+            document.getElementById("micBtn").style.background = "red";
+        } catch (err) {
+            alert("يرجى السماح بالوصول للميكروفون من إعدادات المتصفح");
+        }
     } else {
-        // إيقاف التسجيل للمعاينة
         mediaRecorder.stop();
         isRecording = false;
-        document.getElementById("micBtn").style.display = "none";
-        document.getElementById("sendBtn").style.display = "flex"; // يظهر زر الإرسال الآن
+        document.getElementById("micBtn").style.display = "none"; // نخفيه عشان يرسل بالزر الأخضر
+        document.getElementById("sendBtn").style.display = "flex";
     }
 }
 
+async function sendVoice() {
+    if (!audioBlob) return;
+    const sendBtn = document.getElementById("sendBtn");
+    sendBtn.disabled = true;
+    sendBtn.innerText = "...";
+
+    try {
+        const ref = storage.ref("voice/" + Date.now() + ".mp3");
+        await ref.put(audioBlob);
+        const url = await ref.getDownloadURL();
+        await db.collection("chat").add({
+            name: myName,
+            voice: url,
+            time: Date.now(),
+            readBy: []
+        });
+        document.getElementById("sendSound").play().catch(e => {});
+        cancelVoice();
+    } catch (e) { alert("فشل رفع الصوت"); }
+    
+    sendBtn.disabled = false;
+    sendBtn.innerText = "➤";
+}
+
 function cancelVoice() {
+    audioBlob = null;
     document.getElementById("voicePreview").style.display = "none";
     document.getElementById("normalInput").style.display = "flex";
     document.getElementById("micBtn").style.display = "flex";
     document.getElementById("micBtn").innerHTML = "🎙️";
+    document.getElementById("micBtn").style.background = "#075e54";
     document.getElementById("sendBtn").style.display = "flex";
-    audioBlob = null;
 }
 
-// --- نظام الإرسال (نص أو صوت) ---
-async function sendMsg() {
-    const input = document.getElementById("msgInput");
-    
-    // إذا كان هناك صوت مسجل في المعاينة
-    if (audioBlob) {
-        const ref = storage.ref("voice/" + Date.now() + ".mp3");
-        await ref.put(audioBlob);
-        const url = await ref.getDownloadURL();
-        db.collection("chat").add({ name: myName, voice: url, time: Date.now(), readBy: [] });
-        cancelVoice();
-        document.getElementById("sendSound").play().catch(e => {});
-        return;
-    }
-
-    // إرسال نص عادي
-    if(!input.value.trim()) return;
-    db.collection("chat").add({ name: myName, text: input.value, time: Date.now(), readBy: [] });
-    document.getElementById("sendSound").play().catch(e => {});
-    input.value = "";
-}
-
-// --- عرض الرسائل ---
-db.collection("chat").orderBy("time").onSnapshot(snap => {
-    const chatBox = document.getElementById("chat");
-    chatBox.innerHTML = "";
-    snap.forEach(doc => {
-        const d = doc.data();
-        const isMe = d.name === myName;
-        const side = isMe ? "me" : "other";
-        const t = new Date(d.time).toLocaleTimeString("ar-BH", {hour:'2-digit', minute:'2-digit'});
-        
-        let content = d.text ? `<div>${d.text}</div>` : "";
-        if(d.img) content += `<img src="${d.img}" class="msg-img">`;
-        if(d.voice) content += `<audio controls class="msg-audio" src="${d.voice}"></audio>`;
-
-        let tickClass = (d.readBy && d.readBy.length > 0) ? "is-read" : "";
-        chatBox.innerHTML += `
-        <div class="msg ${side}">
-            <div style="font-size:11px; color:var(--primary); font-weight:bold">${d.name}</div>
-            ${content}
-            <div class="time">${t} ${isMe ? `<span class="read-tick ${tickClass}">✔️✔️</span>` : ""}</div>
-        </div>`;
-    });
-    
-    if (!isInitialLoad) {
-        let last = snap.docChanges()[snap.docChanges().length-1];
-        if(last && last.type === "added" && last.doc.data().name !== myName) {
-            document.getElementById("receiveSound").play().catch(e => {});
-        }
-    }
-    isInitialLoad = false;
-    chatBox.scrollTop = chatBox.scrollHeight;
-});
-
-// --- وظائف الهيدر (الاتصال، الشبح، الخ) ---
-function startCall() {
-    if(confirm("رنين للطرف الآخر؟")) db.collection("calls").add({ from: myName, time: Date.now() });
-}
-db.collection("calls").orderBy("time", "desc").limit(1).onSnapshot(snap => {
-    snap.forEach(doc => {
-        if(doc.data().from !== myName && (Date.now() - doc.data().time < 10000)) {
-            document.getElementById("callerName").innerText = doc.data().from;
-            document.getElementById("callOverlay").style.display = "flex";
-            document.getElementById("ringtone").play().catch(e => {});
-        }
-    });
-});
-function stopRinging() { 
-    document.getElementById("callOverlay").style.display = "none"; 
-    document.getElementById("ringtone").pause(); 
-}
-function changeName() {
-    let n = prompt("تغيير الاسم:", myName);
-    if(n) { localStorage.setItem("chatName", n); location.reload(); }
-}
-function enterAdmin() {
-    let p = prompt("كلمة سر الشبح:");
-    if(p === "123") { document.getElementById("appBody").classList.toggle("admin-active"); alert("تم تغيير الوضع"); }
-}
-function clearLocal() {
-    if(confirm("مسح؟")) { localStorage.setItem("hidden_msgs", JSON.stringify([])); location.reload(); }
-}
-imgUpload.onchange = (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const ref = storage.ref("imgs/" + Date.now());
-    ref.put(file).then(() => ref.getDownloadURL().then(url => {
-        db.collection("chat").add({ name: myName, img: url, time: Date.now(), readBy: [] });
-    }));
-};
+// أضف بقية الكود الخاص بعرض الرسائل (onSnapshot) كما هو في نسختك السابقة
 </script>
-</body>
-</html>
