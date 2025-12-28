@@ -1,209 +1,176 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>محادثة</title>
+<title>محادثة احترافية</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#ece5dd}
-.header{background:#075e54;color:#fff;padding:10px;display:flex;justify-content:space-between}
-#chat{padding:10px;height:70vh;overflow-y:auto}
-.msg{max-width:75%;padding:8px;margin:6px 0;border-radius:8px}
-.me{background:#dcf8c6;margin-left:auto}
-.other{background:#fff}
-.name{font-size:11px;color:#555}
-.time{font-size:10px;color:#666;margin-top:4px}
-.footer{display:flex;gap:5px;padding:8px;background:#f0f0f0}
-.footer input{flex:1;padding:8px;border-radius:20px;border:1px solid #ccc}
-button{border:none;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer}
-.red{background:#b00020}
-.green{background:#075e54}
-.actions{display:flex;gap:5px;margin-top:5px}
-.status{font-size:11px;color:#555;text-align:left}
-img{max-width:100%;border-radius:6px}
+:root {
+    --primary: #075e54;
+    --secondary: #25d366;
+    --bg-chat: #e5ddd5;
+    --msg-me: #dcf8c6;
+    --msg-other: #ffffff;
+}
+
+body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-chat); display: flex; flex-direction: column; height: 100vh; }
+
+.header { background: var(--primary); color: #fff; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+
+#chat { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-blend-mode: overlay; }
+
+.msg { max-width: 80%; padding: 10px 15px; border-radius: 15px; position: relative; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.me { background: var(--msg-me); align-self: flex-start; border-top-right-radius: 2px; }
+.other { background: var(--msg-other); align-self: flex-end; border-top-left-radius: 2px; }
+
+.name { font-size: 12px; font-weight: bold; color: var(--primary); margin-bottom: 4px; }
+.time { font-size: 10px; color: #888; text-align: left; margin-top: 5px; }
+
+.footer { display: flex; gap: 10px; padding: 12px; background: #f0f0f0; align-items: center; }
+.footer input { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
+.btn-action { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+
+img { max-width: 100%; border-radius: 10px; margin-top: 5px; }
+audio { margin-top: 5px; height: 35px; width: 200px; }
+.btn-delete { background: #ff4d4d; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 5px; }
 </style>
 </head>
-
 <body>
 
 <div class="header">
-  <div>محادثة</div>
-  <button class="red" onclick="clearAll()">مسح الكل</button>
+    <div onclick="changeName()" style="cursor:pointer">👤 <span id="currentUserName">تحميل...</span></div>
+    <button style="background:transparent; border:1px solid #fff; color:white; padding:5px; border-radius:5px;" onclick="clearAll()">حذف الكل</button>
 </div>
 
 <div id="chat"></div>
 
+<audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+
 <div class="footer">
-  <input type="file" id="imgInput" hidden accept="image/*">
-  <button class="green" onclick="imgInput.click()">🖼️</button>
-  <input id="msgInput" placeholder="اكتب رسالة">
-  <button class="green" onclick="sendText()">➤</button>
-  <button id="recBtn">🎙️</button>
+    <input type="file" id="imgInput" hidden accept="image/*">
+    <button class="btn-action" onclick="imgInput.click()">🖼️</button>
+    <input id="msgInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter') sendText()">
+    <button id="recBtn" class="btn-action">🎙️</button>
+    <button class="btn-action" onclick="sendText()">➤</button>
 </div>
 
 <script>
-const myName = prompt("اكتب اسمك");
-
-/* Firebase */
-firebase.initializeApp({
+/* إعدادات Firebase الخاصة بك - تم إضافتها هنا */
+const firebaseConfig = {
   apiKey: "AIzaSyC3T6PvAihbgMFvxsW4eC1WYwhQ_33tAJw",
   authDomain: "chat-bcdc8.firebaseapp.com",
   projectId: "chat-bcdc8",
   storageBucket: "chat-bcdc8.firebasestorage.app",
-});
+};
 
+firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const storage = firebase.storage();
 
-/* عرض الرسائل */
-db.collection("chat").orderBy("time").onSnapshot(snap=>{
-  chat.innerHTML="";
-  const hidden = JSON.parse(localStorage.getItem("hiddenMsgs")||"[]");
+let myName = localStorage.getItem("chatName") || prompt("اكتب اسمك") || "زائر";
+localStorage.setItem("chatName", myName);
+document.getElementById("currentUserName").innerText = myName;
 
-  snap.forEach(doc=>{
-    if(hidden.includes(doc.id)) return;
+let lastMsgTime = Date.now();
 
-    const d = doc.data();
-    const isMe = d.name === myName;
-    const side = isMe ? "me" : "other";
-    const t = new Date(d.time).toLocaleTimeString("ar-BH");
-    const deleted = d.deletedForAll === true;
-
-    /* تسجيل القراءة */
-    if(!isMe && !deleted && (!d.readBy || !d.readBy.includes(myName))){
-      db.collection("chat").doc(doc.id).update({
-        readBy: firebase.firestore.FieldValue.arrayUnion(myName)
-      });
+// وظيفة تغيير الاسم
+function changeName() {
+    let newName = prompt("اكتب اسمك الجديد:", myName);
+    if(newName) {
+        myName = newName;
+        localStorage.setItem("chatName", myName);
+        document.getElementById("currentUserName").innerText = myName;
     }
+}
 
-    let status = "";
-    if(isMe && !deleted){
-      if(d.readBy && d.readBy.length > 0){
-        status = "✔✔️ تم القراءة";
-      }else{
-        status = "✔️ تم الإرسال";
-      }
+// عرض الرسائل وتنبيه الصوت
+db.collection("chat").orderBy("time").onSnapshot(snap => {
+    const chatDiv = document.getElementById("chat");
+    chatDiv.innerHTML = "";
+    let hasNew = false;
+
+    snap.forEach(doc => {
+        const d = doc.data();
+        if(d.time > lastMsgTime) hasNew = true;
+
+        const isMe = d.name === myName;
+        const side = isMe ? "me" : "other";
+        const t = new Date(d.time).toLocaleTimeString("ar-BH", {hour:'2-digit', minute:'2-digit'});
+        const deleted = d.deletedForAll === true;
+
+        chatDiv.innerHTML += `
+        <div class="msg ${side}">
+            <div class="name">${d.name}</div>
+            ${deleted ? `<div style="color:#999; font-style:italic">🚫 تم حذف الرسالة</div>` : `
+                <div>${d.text || ""}</div>
+                ${d.img ? `<img src="${d.img}">` : ""}
+                ${d.audio ? `<audio controls src="${d.audio}"></audio>` : ""}
+            `}
+            <div class="time">${t}</div>
+            ${isMe && !deleted ? `<button class="btn-delete" onclick="deleteForAll('${doc.id}')">حذف للجميع</button>` : ""}
+        </div>`;
+    });
+
+    if(hasNew) {
+        document.getElementById("notifSound").play().catch(()=>{});
+        lastMsgTime = Date.now();
     }
-
-    chat.innerHTML += `
-    <div class="msg ${side}">
-      <div class="name">${d.name}</div>
-
-      ${deleted
-        ? `<div style="color:#777;font-style:italic">🚫 تم مسح الرسالة</div>`
-        : `
-          <div>${d.text || ""}</div>
-          ${d.img ? `<img src="${d.img}">` : ""}
-          ${d.audio ? `<audio controls src="${d.audio}"></audio>` : ""}
-        `
-      }
-
-      <div class="time">${t}</div>
-      ${isMe ? `<div class="status">${status}</div>` : ""}
-
-      ${isMe && !deleted ? `
-      <div class="actions">
-        <button class="red" onclick="deleteForMe('${doc.id}')">حذف عندي</button>
-        <button class="red" onclick="deleteForAll('${doc.id}')">حذف عند الجميع</button>
-      </div>` : ""}
-    </div>`;
-  });
-
-  chat.scrollTop = chat.scrollHeight;
+    chatDiv.scrollTop = chatDiv.scrollHeight;
 });
 
-/* إرسال نص */
 function sendText(){
-  const text = msgInput.value.trim();
-  if(!text) return;
-
-  db.collection("chat").add({
-    name: myName,
-    text: text,
-    time: Date.now(),
-    sent: true,
-    readBy: []
-  });
-
-  msgInput.value="";
+    const input = document.getElementById("msgInput");
+    if(!input.value.trim()) return;
+    db.collection("chat").add({ name: myName, text: input.value, time: Date.now() });
+    input.value = "";
 }
 
-/* حذف عندي فقط */
-function deleteForMe(id){
-  const h = JSON.parse(localStorage.getItem("hiddenMsgs") || "[]");
-  if(!h.includes(id)){
-    h.push(id);
-    localStorage.setItem("hiddenMsgs", JSON.stringify(h));
-  }
-}
-
-/* حذف عند الجميع */
 function deleteForAll(id){
-  db.collection("chat").doc(id).update({
-    deletedForAll: true,
-    text: "",
-    img: "",
-    audio: ""
-  });
+    if(confirm("حذف الرسالة؟")) db.collection("chat").doc(id).update({ deletedForAll: true, text: "", img: "", audio: "" });
 }
 
-/* صورة */
-imgInput.onchange = ()=>{
-  const f = imgInput.files[0];
-  if(!f) return;
-  const ref = storage.ref("imgs/"+Date.now());
-  ref.put(f).then(()=>ref.getDownloadURL().then(url=>{
-    db.collection("chat").add({
-      name: myName,
-      img: url,
-      time: Date.now(),
-      sent: true,
-      readBy: []
-    });
-  }));
-  imgInput.value="";
-};
-
-/* صوت */
-let rec=null, stream=null, chunks=[];
-recBtn.onclick = async ()=>{
-  if(!rec){
-    stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    rec = new MediaRecorder(stream);
-    rec.ondataavailable = e => chunks.push(e.data);
-    rec.start();
-    recBtn.innerText="⏹️";
-  }else{
-    rec.stop();
-    recBtn.innerText="🎙️";
-    rec.onstop = ()=>{
-      const blob = new Blob(chunks,{type:"audio/mp4"});
-      chunks=[];
-      const ref = storage.ref("audio/"+Date.now());
-      ref.put(blob).then(()=>ref.getDownloadURL().then(url=>{
-        db.collection("chat").add({
-          name: myName,
-          audio: url,
-          time: Date.now(),
-          sent: true,
-          readBy: []
-        });
-      }));
-    };
-    rec=null;
-  }
-};
-
-/* مسح الكل */
 function clearAll(){
-  db.collection("chat").get().then(s=>s.forEach(d=>d.ref.delete()));
+    if(confirm("مسح كل المحادثة؟")) db.collection("chat").get().then(s => s.forEach(d => d.ref.delete()));
 }
-</script>
 
+// رفع الصور
+document.getElementById("imgInput").onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const ref = storage.ref("imgs/" + Date.now());
+    ref.put(file).then(() => ref.getDownloadURL().then(url => {
+        db.collection("chat").add({ name: myName, img: url, time: Date.now() });
+    })).catch(() => alert("تأكد من تفعيل Storage Rules"));
+};
+
+// تسجيل الصوت
+let rec=null, chunks=[];
+document.getElementById("recBtn").onclick = async () => {
+    if(!rec){
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        rec = new MediaRecorder(stream);
+        rec.ondataavailable = e => chunks.push(e.data);
+        rec.start();
+        document.getElementById("recBtn").innerText = "⏹️";
+    } else {
+        rec.stop();
+        document.getElementById("recBtn").innerText = "🎙️";
+        rec.onstop = () => {
+            const blob = new Blob(chunks, {type: "audio/mp4"});
+            chunks = [];
+            const ref = storage.ref("audio/" + Date.now());
+            ref.put(blob).then(() => ref.getDownloadURL().then(url => {
+                db.collection("chat").add({ name: myName, audio: url, time: Date.now() });
+            }));
+        };
+        rec = null;
+    }
+};
+</script>
 </body>
 </html>
