@@ -3,94 +3,86 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Chat Pro</title>
+<title>Chat Admin Pro</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <style>
-:root { --primary: #2c3e50; --accent: #3498db; --bg: #e5ddd5; --me: #dcf8c6; --other: #fff; --red: #e74c3c; }
-body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
+:root { --primary: #2c3e50; --accent: #3498db; --bg: #e5ddd5; --me: #dcf8c6; --other: #fff; --red: #e74c3c; --admin: #8e44ad; }
+body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
 
-/* هيدر متناسق */
-.header { background: var(--primary); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; height: 50px; }
+/* الهيدر */
+.header { background: var(--primary); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 55px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 .header-profile { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.chat-icon { width: 35px; height: 35px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.user-info span { display: block; font-size: 14px; font-weight: bold; }
+.chat-icon { width: 38px; height: 38px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: 0.3s; }
+.chat-icon.admin-active { background: var(--admin); box-shadow: 0 0 10px var(--admin); }
 
-/* منطقة الشات للهواتف */
-#chat { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); -webkit-overflow-scrolling: touch; }
+/* منطقة الشات */
+#chat { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); }
 
 /* الفقاعات */
-.msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; position: relative; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-wrap: break-word; }
+.msg { max-width: 85%; padding: 10px; border-radius: 12px; position: relative; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .msg.me { align-self: flex-start; background: var(--me); border-top-right-radius: 2px; }
 .msg.other { align-self: flex-end; background: var(--other); border-top-left-radius: 2px; }
 
-/* أزرار التحكم بالرسالة */
-.msg-actions { display: flex; gap: 10px; margin-top: 5px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 5px; }
-.action-btn { background: none; border: none; font-size: 11px; color: #7f8c8d; cursor: pointer; padding: 2px 5px; }
-.action-btn.del { color: var(--red); }
+/* أزرار الإدارة */
+.admin-tools { display: none; margin-top: 8px; border-top: 1px dashed #ccc; padding-top: 5px; gap: 10px; }
+.admin-mode-active .admin-tools { display: flex; }
+.adm-btn { font-size: 10px; padding: 4px 8px; border-radius: 5px; border: none; cursor: pointer; color: white; }
+.btn-edit { background: var(--accent); }
+.btn-del { background: var(--red); }
 
-.time { font-size: 10px; color: #95a5a6; display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 4px; }
-.read-tick { color: #3498db; }
+.time { font-size: 10px; color: #95a5a6; display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 5px; }
 
-/* الفوتر للهاتف */
-.footer { display: flex; gap: 8px; padding: 10px; background: #f0f2f5; align-items: center; box-sizing: border-box; }
+/* الفوتر */
+.footer { display: flex; gap: 8px; padding: 10px; background: #f0f2f5; align-items: center; }
 .input-area { flex: 1; background: white; border-radius: 25px; display: flex; padding: 2px 12px; align-items: center; border: 1px solid #ddd; }
-.input-area input { border: none; outline: none; flex: 1; padding: 8px; font-size: 16px; width: 100%; }
-.btn-round { background: var(--accent); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-
-/* الإيموجي */
-.emoji-panel { display: none; position: absolute; bottom: 65px; left: 10px; background: white; border-radius: 15px; padding: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); z-index: 1000; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-.emoji-panel span { font-size: 24px; cursor: pointer; padding: 5px; text-align: center; }
+.input-area input { border: none; outline: none; flex: 1; padding: 10px; font-size: 16px; }
+.btn-send { background: var(--accent); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
 /* مودال الاسم */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
-.modal-content { background: white; padding: 20px; border-radius: 15px; width: 85%; max-width: 300px; text-align: center; }
-.modal-content input { width: 90%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 8px; }
+.modal-content { background: white; padding: 20px; border-radius: 15px; width: 80%; max-width: 300px; text-align: center; }
+.modal-content input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
 
 img.msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
 </style>
 </head>
-<body>
+<body id="mainBody">
 
 <div id="nameModal" class="modal">
     <div class="modal-content">
-        <h3>تغيير الاسم</h3>
-        <input type="text" id="newNameInput" placeholder="اكتب اسمك الجديد">
-        <button class="btn-round" style="width: 100%; border-radius: 10px;" onclick="saveNewName()">حفظ</button>
-        <button onclick="closeNameModal()" style="background:none; border:none; margin-top:10px; color:#666;">إغاء</button>
+        <h3 id="modalTitle">إعدادات الملف</h3>
+        <input type="text" id="newNameInput" placeholder="ادخل القيمة هنا...">
+        <button class="btn-send" style="width: 100%; border-radius: 10px;" onclick="handleModalSubmit()">تأكيد</button>
+        <button onclick="closeModal()" style="background:none; border:none; margin-top:10px; color:#666;">إلغاء</button>
     </div>
 </div>
 
 <div class="header">
-    <div class="header-profile" onclick="openNameModal()">
-        <div class="chat-icon">💬</div>
+    <div class="header-profile" onclick="checkAdmin()">
+        <div id="adminIcon" class="chat-icon">💬</div>
         <div class="user-info">
             <span id="display-name">...</span>
+            <small id="status-text">متصل</small>
         </div>
     </div>
-    <button style="background:none; border:none; color:white; font-size: 18px;" onclick="clearForMe()">🗑️</button>
+    <div style="display:flex; gap:10px;">
+        <button style="background:none; border:none; color:white; font-size: 20px;" onclick="clearForMe()">🗑️</button>
+    </div>
 </div>
 
 <div id="chat"></div>
 
-<div id="emojiPanel" class="emoji-panel">
-    <span onclick="addEmoji('💔')">💔</span><span onclick="addEmoji('🥹')">🥹</span>
-    <span onclick="addEmoji('😔')">😔</span><span onclick="addEmoji('🥲')">🥲</span>
-    <span onclick="addEmoji('😘')">😘</span><span onclick="addEmoji('😂')">😂</span>
-    <span onclick="addEmoji('❤️')">❤️</span><span onclick="addEmoji('👍')">👍</span>
-</div>
-
 <div class="footer">
-    <button class="btn-round" style="background:none; color:#7f8c8d;" onclick="toggleEmoji()">😊</button>
     <div class="input-area">
-        <input id="msgInput" placeholder="اكتب..." onkeypress="if(event.key==='Enter') sendText()">
-        <label for="imgInput" style="cursor:pointer; font-size: 20px;">🖼️</label>
+        <input id="msgInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter') sendText()">
+        <label for="imgInput" style="cursor:pointer; font-size: 20px; margin-left:10px;">🖼️</label>
         <input type="file" id="imgInput" hidden accept="image/*">
     </div>
-    <button class="btn-round" onclick="sendText()">➤</button>
+    <button class="btn-send" onclick="sendText()">➤</button>
 </div>
 
 <script>
@@ -105,17 +97,32 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 
 let myName = localStorage.getItem("chatName") || "مستخدم";
+let isAdmin = false;
 document.getElementById("display-name").innerText = myName;
 
+// نظام دخول المسؤول (كلمة السر الافتراضية: 123)
+function checkAdmin() {
+    let pass = prompt("ادخل كلمة سر المسؤول للتحكم (أو اترك فارغاً لتغيير اسمك):");
+    if(pass === "123") {
+        isAdmin = !isAdmin;
+        document.body.classList.toggle("admin-mode-active", isAdmin);
+        document.getElementById("adminIcon").classList.toggle("admin-active", isAdmin);
+        document.getElementById("status-text").innerText = isAdmin ? "وضع المسؤول نشط" : "متصل";
+        alert(isAdmin ? "تم تفعيل وضع المسؤول - يمكنك الآن حذف وتعديل أي رسالة" : "تم الخروج من وضع المسؤول");
+    } else {
+        openNameModal();
+    }
+}
+
 function openNameModal() { document.getElementById("nameModal").style.display = "flex"; }
-function closeNameModal() { document.getElementById("nameModal").style.display = "none"; }
-function saveNewName() {
+function closeModal() { document.getElementById("nameModal").style.display = "none"; }
+function handleModalSubmit() {
     let n = document.getElementById("newNameInput").value.trim();
     if(n) { localStorage.setItem("chatName", n); location.reload(); }
 }
 
 function clearForMe() {
-    if(confirm("مسح عندك فقط؟")) {
+    if(confirm("مسح المحادثة من جهازك فقط؟")) {
         localStorage.setItem("hidden_messages", JSON.stringify(Array.from(allMsgIds)));
         location.reload();
     }
@@ -130,33 +137,25 @@ db.collection("chat").orderBy("time").onSnapshot(snap => {
 
     snap.forEach(doc => {
         allMsgIds.add(doc.id);
-        if(hidden.includes(doc.id)) return;
+        if(!isAdmin && hidden.includes(doc.id)) return;
 
         const d = doc.data();
         const isMe = d.name === myName;
         const side = isMe ? "me" : "other";
         const t = new Date(d.time).toLocaleTimeString("ar-BH", {hour:'2-digit', minute:'2-digit'});
-        const deletedForAll = d.deletedForAll === true;
-
-        if(!isMe && !deletedForAll && (!d.readBy || !d.readBy.includes(myName))) {
-            db.collection("chat").doc(doc.id).update({ readBy: firebase.firestore.FieldValue.arrayUnion(myName) });
-        }
-
-        let ticks = isMe && !deletedForAll ? (d.readBy?.length > 0 ? '<span class="read-tick">✔️✔️</span>' : '✔️') : '';
+        const deleted = d.deletedForAll === true;
 
         chat.innerHTML += `
         <div class="msg ${side}">
             <div style="font-size:11px; color:var(--accent); font-weight:bold">${d.name}</div>
-            <div>${deletedForAll ? '<i style="color:#999">🚫 تم حذف الرسالة عند الجميع</i>' : (d.text || "")} ${d.edited ? '<small style="color:#888">(معدلة)</small>' : ''}</div>
-            ${!deletedForAll && d.img ? `<img src="${d.img}" class="msg-img">` : ""}
-            <div class="time">${t} ${ticks}</div>
+            <div>${deleted ? '<i style="color:#999">🚫 رسالة محذوفة</i>' : (d.text || "")}</div>
+            ${!deleted && d.img ? `<img src="${d.img}" class="msg-img">` : ""}
+            <div class="time">${t}</div>
             
-            ${isMe && !deletedForAll ? `
-                <div class="msg-actions">
-                    <button class="action-btn" onclick="editMsg('${doc.id}', '${d.text}')">تعديل</button>
-                    <button class="action-btn del" onclick="deleteForAll('${doc.id}')">حذف للكل</button>
-                </div>
-            ` : ""}
+            <div class="admin-tools">
+                <button class="adm-btn btn-edit" onclick="editMsg('${doc.id}', '${d.text}')">تعديل</button>
+                <button class="adm-btn btn-del" onclick="deleteMsg('${doc.id}')">حذف نهائي</button>
+            </div>
         </div>`;
     });
     chat.scrollTop = chat.scrollHeight;
@@ -165,36 +164,27 @@ db.collection("chat").orderBy("time").onSnapshot(snap => {
 function sendText() {
     const input = document.getElementById("msgInput");
     if(!input.value.trim()) return;
-    db.collection("chat").add({ name: myName, text: input.value, time: Date.now(), readBy: [] });
+    db.collection("chat").add({ name: myName, text: input.value, time: Date.now() });
     input.value = "";
-    document.getElementById("emojiPanel").style.display = "none";
 }
 
-function deleteForAll(id) {
-    if(confirm("حذف عند الجميع؟")) {
-        db.collection("chat").doc(id).update({ deletedForAll: true, text: "", img: "" });
+function deleteMsg(id) {
+    if(confirm("هل تريد حذف هذه الرسالة نهائياً من قاعدة البيانات؟")) {
+        db.collection("chat").doc(id).delete();
     }
 }
 
 function editMsg(id, oldText) {
-    const newText = prompt("تعديل الرسالة:", oldText);
-    if(newText && newText !== oldText) {
-        db.collection("chat").doc(id).update({ text: newText, edited: true });
-    }
+    const newText = prompt("تعديل نص الرسالة:", oldText);
+    if(newText) db.collection("chat").doc(id).update({ text: newText, edited: true });
 }
-
-function toggleEmoji() {
-    const p = document.getElementById("emojiPanel");
-    p.style.display = p.style.display === "grid" ? "none" : "grid";
-}
-function addEmoji(e) { document.getElementById("msgInput").value += e; }
 
 imgInput.onchange = (e) => {
     const file = e.target.files[0];
     if(!file) return;
     const ref = storage.ref("imgs/" + Date.now());
     ref.put(file).then(() => ref.getDownloadURL().then(url => {
-        db.collection("chat").add({ name: myName, img: url, time: Date.now(), readBy: [] });
+        db.collection("chat").add({ name: myName, img: url, time: Date.now() });
     }));
 };
 </script>
