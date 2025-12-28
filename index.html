@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>WhatsApp Pro + Sound</title>
+<title>WhatsApp Pro + Voice</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -14,9 +14,7 @@
 body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
 
 .header { background: var(--primary); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 55px; z-index: 10; }
-.header-right { display: flex; align-items: center; gap: 15px; }
-.ghost-btn { cursor: pointer; font-size: 22px; filter: grayscale(1); transition: 0.3s; }
-.admin-active .ghost-btn { filter: grayscale(0) drop-shadow(0 0 5px white); }
+.header-right { display: flex; align-items: center; gap: 12px; }
 
 #chat { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); }
 
@@ -24,23 +22,29 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); di
 .msg.me { align-self: flex-start; background: var(--me); border-top-right-radius: 2px; }
 .msg.other { align-self: flex-end; background: var(--other); border-top-left-radius: 2px; }
 
-.msg-tools { display: flex; gap: 8px; margin-top: 5px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 5px; }
-.tool-btn { background: none; border: none; font-size: 11px; color: #777; cursor: pointer; }
-.admin-only { display: none; }
-.admin-active .admin-only { display: inline-block; }
-
 .time { font-size: 10px; color: #888; display: flex; justify-content: flex-end; align-items: center; gap: 3px; margin-top: 4px; }
 .read-tick { color: #888; font-size: 14px; }
 .is-read { color: var(--read); }
 
-.emoji-panel { display: none; position: absolute; bottom: 70px; right: 10px; background: white; border-radius: 15px; padding: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; width: 220px; grid-template-columns: repeat(5, 1fr); }
-.emoji-panel span { font-size: 24px; cursor: pointer; text-align: center; padding: 5px; }
-
-.footer { display: flex; gap: 8px; padding: 10px; background: #f0f0f0; align-items: center; }
-.input-box { flex: 1; background: white; border-radius: 25px; display: flex; padding: 5px 15px; align-items: center; }
+/* الفوتر وتنسيق التسجيل */
+.footer { background: #f0f0f0; padding: 10px; position: relative; }
+.footer-main { display: flex; gap: 8px; align-items: center; }
+.input-box { flex: 1; background: white; border-radius: 25px; display: flex; padding: 5px 15px; align-items: center; border: 1px solid #ddd; }
 .input-box input { border: none; outline: none; flex: 1; padding: 8px; font-size: 16px; }
-.btn-send { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.btn-action { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
 
+/* لوحة المعاينة قبل الإرسال */
+#voicePreview { display: none; background: #fff; border-radius: 25px; padding: 5px 15px; align-items: center; gap: 10px; flex: 1; border: 1px solid var(--accent); }
+#voicePreview audio { height: 30px; flex: 1; }
+
+.recording-blink { color: red; animation: blink 1s infinite; font-weight: bold; margin-right: 10px; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* نافذة الاتصال */
+#callOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(7, 94, 84, 0.95); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
+.btn-hangup { background: #ff3b30; color: white; border: none; padding: 15px 40px; border-radius: 30px; font-size: 18px; cursor: pointer; margin-top: 50px; }
+
+audio.msg-audio { width: 100%; max-width: 250px; margin-top: 5px; }
 img.msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
 </style>
 </head>
@@ -48,35 +52,45 @@ img.msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
 
 <audio id="sendSound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
 <audio id="receiveSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+<audio id="ringtone" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
+
+<div id="callOverlay">
+    <div style="font-size: 60px; margin-bottom: 20px;">📞</div>
+    <h2 id="callerName">...</h2>
+    <p>اتصال وارد</p>
+    <button class="btn-hangup" onclick="stopRinging()">إغلاق</button>
+</div>
 
 <div class="header">
     <div class="header-right">
         <span onclick="changeName()" style="cursor:pointer; font-weight:bold;">👤 <span id="userLabel">...</span></span>
     </div>
-    <div style="display:flex; align-items:center; gap:15px;">
-        <span class="ghost-btn" onclick="enterAdmin()">👻</span>
+    <div style="display:flex; align-items:center; gap:18px;">
+        <span onclick="startCall()" style="cursor:pointer; font-size: 20px;">📞</span>
+        <span class="ghost-btn" onclick="enterAdmin()" style="cursor:pointer; font-size: 20px;">👻</span>
         <button style="background:none; border:none; color:white; font-size: 18px;" onclick="clearLocal()">🗑️</button>
     </div>
 </div>
 
 <div id="chat"></div>
 
-<div id="emojiPanel" class="emoji-panel">
-    <span onclick="putEmoji('💔')">💔</span><span onclick="putEmoji('🥹')">🥹</span>
-    <span onclick="putEmoji('😔')">😔</span><span onclick="putEmoji('🥲')">🥲</span>
-    <span onclick="putEmoji('😘')">😘</span><span onclick="putEmoji('😂')">😂</span>
-    <span onclick="putEmoji('❤️')">❤️</span><span onclick="putEmoji('👍')">👍</span>
-    <span onclick="putEmoji('😍')">😍</span><span onclick="putEmoji('🔥')">🔥</span>
-</div>
-
 <div class="footer">
-    <button class="btn-send" style="background:none; color:#555;" onclick="toggleEmoji()">😊</button>
-    <div class="input-box">
-        <input id="msgInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter') sendMsg()">
-        <label for="imgUpload" style="cursor:pointer; font-size: 20px; margin-right: 10px;">🖼️</label>
-        <input type="file" id="imgUpload" hidden accept="image/*">
+    <div class="footer-main">
+        <div id="normalInput" class="input-box" style="display: flex;">
+            <input id="msgInput" placeholder="اكتب رسالة..." onkeypress="if(event.key==='Enter') sendMsg()">
+            <label for="imgUpload" style="cursor:pointer; font-size: 20px; margin-right: 10px;">🖼️</label>
+            <input type="file" id="imgUpload" hidden accept="image/*">
+        </div>
+
+        <div id="voicePreview">
+            <span class="recording-blink" id="recStatus">●</span>
+            <audio id="audioPreview" controls></audio>
+            <button onclick="cancelVoice()" style="background:none; border:none; color:red; font-size: 18px;">🗑️</button>
+        </div>
+
+        <button id="sendBtn" class="btn-action" onclick="sendMsg()">➤</button>
+        <button id="micBtn" class="btn-action" onclick="toggleRecording()">🎙️</button>
     </div>
-    <button class="btn-send" onclick="sendMsg()">➤</button>
 </div>
 
 <script>
@@ -91,120 +105,146 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 
 let myName = localStorage.getItem("chatName") || "مستخدم";
-let isAdmin = false;
-let isInitialLoad = true; // لمنع تشغيل الصوت عند فتح الصفحة لأول مرة
+let isInitialLoad = true;
+let mediaRecorder;
+let audioChunks = [];
+let audioBlob;
+let isRecording = false;
+
 document.getElementById("userLabel").innerText = myName;
 
-function enterAdmin() {
-    let p = prompt("كلمة سر الشبح:");
-    if(p === "123") {
-        isAdmin = !isAdmin;
-        document.getElementById("appBody").classList.toggle("admin-active", isAdmin);
-        alert(isAdmin ? "وضع الشبح نشط 👻" : "تم إغلاق وضع الشبح");
+// --- نظام التسجيل الصوتي ---
+async function toggleRecording() {
+    if (!isRecording) {
+        // بدء التسجيل
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            document.getElementById("audioPreview").src = audioUrl;
+            document.getElementById("recStatus").innerText = "معاينة";
+            document.getElementById("recStatus").classList.remove("recording-blink");
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById("normalInput").style.display = "none";
+        document.getElementById("sendBtn").style.display = "none";
+        document.getElementById("voicePreview").style.display = "flex";
+        document.getElementById("micBtn").innerHTML = "⏹️"; // زر الإيقاف
+        document.getElementById("recStatus").innerText = "تسجيل...";
+        document.getElementById("recStatus").classList.add("recording-blink");
+    } else {
+        // إيقاف التسجيل للمعاينة
+        mediaRecorder.stop();
+        isRecording = false;
+        document.getElementById("micBtn").style.display = "none";
+        document.getElementById("sendBtn").style.display = "flex"; // يظهر زر الإرسال الآن
     }
 }
 
-function changeName() {
-    let n = prompt("تغيير اسمك:", myName);
-    if(n) { localStorage.setItem("chatName", n); location.reload(); }
+function cancelVoice() {
+    document.getElementById("voicePreview").style.display = "none";
+    document.getElementById("normalInput").style.display = "flex";
+    document.getElementById("micBtn").style.display = "flex";
+    document.getElementById("micBtn").innerHTML = "🎙️";
+    document.getElementById("sendBtn").style.display = "flex";
+    audioBlob = null;
 }
 
-function clearLocal() {
-    if(confirm("مسح المحادثة من جهازك فقط؟")) {
-        localStorage.setItem("hidden_msgs", JSON.stringify(Array.from(allIds)));
-        location.reload();
+// --- نظام الإرسال (نص أو صوت) ---
+async function sendMsg() {
+    const input = document.getElementById("msgInput");
+    
+    // إذا كان هناك صوت مسجل في المعاينة
+    if (audioBlob) {
+        const ref = storage.ref("voice/" + Date.now() + ".mp3");
+        await ref.put(audioBlob);
+        const url = await ref.getDownloadURL();
+        db.collection("chat").add({ name: myName, voice: url, time: Date.now(), readBy: [] });
+        cancelVoice();
+        document.getElementById("sendSound").play().catch(e => {});
+        return;
     }
+
+    // إرسال نص عادي
+    if(!input.value.trim()) return;
+    db.collection("chat").add({ name: myName, text: input.value, time: Date.now(), readBy: [] });
+    document.getElementById("sendSound").play().catch(e => {});
+    input.value = "";
 }
 
-let allIds = new Set();
-
+// --- عرض الرسائل ---
 db.collection("chat").orderBy("time").onSnapshot(snap => {
     const chatBox = document.getElementById("chat");
     chatBox.innerHTML = "";
-    const hidden = JSON.parse(localStorage.getItem("hidden_msgs") || "[]");
-    
-    let lastDoc = snap.docChanges().slice(-1)[0];
-
     snap.forEach(doc => {
-        allIds.add(doc.id);
-        if(!isAdmin && hidden.includes(doc.id)) return;
-
         const d = doc.data();
         const isMe = d.name === myName;
         const side = isMe ? "me" : "other";
         const t = new Date(d.time).toLocaleTimeString("ar-BH", {hour:'2-digit', minute:'2-digit'});
         
-        if(!isMe && (!d.readBy || !d.readBy.includes(myName))) {
-            db.collection("chat").doc(doc.id).update({ readBy: firebase.firestore.FieldValue.arrayUnion(myName) });
-        }
+        let content = d.text ? `<div>${d.text}</div>` : "";
+        if(d.img) content += `<img src="${d.img}" class="msg-img">`;
+        if(d.voice) content += `<audio controls class="msg-audio" src="${d.voice}"></audio>`;
 
         let tickClass = (d.readBy && d.readBy.length > 0) ? "is-read" : "";
-        let ticks = isMe ? `<span class="read-tick ${tickClass}">✔️✔️</span>` : "";
-
         chatBox.innerHTML += `
         <div class="msg ${side}">
             <div style="font-size:11px; color:var(--primary); font-weight:bold">${d.name}</div>
-            <div>${d.text || ""} ${d.edited ? '<small style="color:#888">(معدلة)</small>' : ''}</div>
-            ${d.img ? `<img src="${d.img}" class="msg-img">` : ""}
-            <div class="time">${t} ${ticks}</div>
-            <div class="msg-tools">
-                ${(isMe || isAdmin) ? `<button class="tool-btn" onclick="editNow('${doc.id}', '${d.text}')">تعديل</button>` : ""}
-                ${(isMe) ? `<button class="tool-btn" onclick="delForAll('${doc.id}')" style="color:red">حذف للكل</button>` : ""}
-                ${(isAdmin) ? `<button class="tool-btn admin-only" onclick="killMsg('${doc.id}')" style="color:black; font-weight:bold;">حذف نهائي (شبح)</button>` : ""}
-            </div>
+            ${content}
+            <div class="time">${t} ${isMe ? `<span class="read-tick ${tickClass}">✔️✔️</span>` : ""}</div>
         </div>`;
     });
-
-    // نظام تشغيل أصوات الإشعارات
-    if (!isInitialLoad && snap.docChanges().length > 0) {
-        snap.docChanges().forEach(change => {
-            if (change.type === "added") {
-                const data = change.doc.data();
-                if (data.name !== myName) {
-                    document.getElementById("receiveSound").play().catch(e => {});
-                }
-            }
-        });
+    
+    if (!isInitialLoad) {
+        let last = snap.docChanges()[snap.docChanges().length-1];
+        if(last && last.type === "added" && last.doc.data().name !== myName) {
+            document.getElementById("receiveSound").play().catch(e => {});
+        }
     }
     isInitialLoad = false;
     chatBox.scrollTop = chatBox.scrollHeight;
 });
 
-function sendMsg() {
-    const input = document.getElementById("msgInput");
-    if(!input.value.trim()) return;
-    db.collection("chat").add({ name: myName, text: input.value, time: Date.now(), readBy: [] });
-    document.getElementById("sendSound").play().catch(e => {}); // صوت الإرسال
-    input.value = "";
-    document.getElementById("emojiPanel").style.display = "none";
+// --- وظائف الهيدر (الاتصال، الشبح، الخ) ---
+function startCall() {
+    if(confirm("رنين للطرف الآخر؟")) db.collection("calls").add({ from: myName, time: Date.now() });
 }
-
-function delForAll(id) {
-    if(confirm("حذف عند الجميع؟")) db.collection("chat").doc(id).update({ text: "🚫 تم حذف الرسالة", img: null, deleted: true });
+db.collection("calls").orderBy("time", "desc").limit(1).onSnapshot(snap => {
+    snap.forEach(doc => {
+        if(doc.data().from !== myName && (Date.now() - doc.data().time < 10000)) {
+            document.getElementById("callerName").innerText = doc.data().from;
+            document.getElementById("callOverlay").style.display = "flex";
+            document.getElementById("ringtone").play().catch(e => {});
+        }
+    });
+});
+function stopRinging() { 
+    document.getElementById("callOverlay").style.display = "none"; 
+    document.getElementById("ringtone").pause(); 
 }
-
-function killMsg(id) {
-    if(confirm("حذف نهائي من السيرفر؟")) db.collection("chat").doc(id).delete();
+function changeName() {
+    let n = prompt("تغيير الاسم:", myName);
+    if(n) { localStorage.setItem("chatName", n); location.reload(); }
 }
-
-function editNow(id, old) {
-    let n = prompt("تعديل الرسالة:", old);
-    if(n) db.collection("chat").doc(id).update({ text: n, edited: true });
+function enterAdmin() {
+    let p = prompt("كلمة سر الشبح:");
+    if(p === "123") { document.getElementById("appBody").classList.toggle("admin-active"); alert("تم تغيير الوضع"); }
 }
-
-function toggleEmoji() {
-    const p = document.getElementById("emojiPanel");
-    p.style.display = p.style.display === "grid" ? "none" : "grid";
+function clearLocal() {
+    if(confirm("مسح؟")) { localStorage.setItem("hidden_msgs", JSON.stringify([])); location.reload(); }
 }
-function putEmoji(e) { document.getElementById("msgInput").value += e; }
-
 imgUpload.onchange = (e) => {
     const file = e.target.files[0];
     if(!file) return;
     const ref = storage.ref("imgs/" + Date.now());
     ref.put(file).then(() => ref.getDownloadURL().then(url => {
         db.collection("chat").add({ name: myName, img: url, time: Date.now(), readBy: [] });
-        document.getElementById("sendSound").play().catch(e => {});
     }));
 };
 </script>
