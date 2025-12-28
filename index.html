@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>WhatsApp Pro</title>
+<title>WhatsApp Pro + Sound</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -13,21 +13,17 @@
 :root { --primary: #075e54; --accent: #25d366; --bg: #e5ddd5; --me: #dcf8c6; --other: #fff; --read: #34b7f1; }
 body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
 
-/* الهيدر الأخضر */
-.header { background: var(--primary); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 55px; }
+.header { background: var(--primary); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; height: 55px; z-index: 10; }
 .header-right { display: flex; align-items: center; gap: 15px; }
 .ghost-btn { cursor: pointer; font-size: 22px; filter: grayscale(1); transition: 0.3s; }
 .admin-active .ghost-btn { filter: grayscale(0) drop-shadow(0 0 5px white); }
 
-/* منطقة الشات */
 #chat { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); }
 
-/* الفقاعات */
 .msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; position: relative; font-size: 15px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
 .msg.me { align-self: flex-start; background: var(--me); border-top-right-radius: 2px; }
 .msg.other { align-self: flex-end; background: var(--other); border-top-left-radius: 2px; }
 
-/* أزرار التحكم */
 .msg-tools { display: flex; gap: 8px; margin-top: 5px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 5px; }
 .tool-btn { background: none; border: none; font-size: 11px; color: #777; cursor: pointer; }
 .admin-only { display: none; }
@@ -37,11 +33,9 @@ body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); di
 .read-tick { color: #888; font-size: 14px; }
 .is-read { color: var(--read); }
 
-/* لوحة الإيموجي */
 .emoji-panel { display: none; position: absolute; bottom: 70px; right: 10px; background: white; border-radius: 15px; padding: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; width: 220px; grid-template-columns: repeat(5, 1fr); }
 .emoji-panel span { font-size: 24px; cursor: pointer; text-align: center; padding: 5px; }
 
-/* الفوتر */
 .footer { display: flex; gap: 8px; padding: 10px; background: #f0f0f0; align-items: center; }
 .input-box { flex: 1; background: white; border-radius: 25px; display: flex; padding: 5px 15px; align-items: center; }
 .input-box input { border: none; outline: none; flex: 1; padding: 8px; font-size: 16px; }
@@ -51,6 +45,9 @@ img.msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
 </style>
 </head>
 <body id="appBody">
+
+<audio id="sendSound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3"></audio>
+<audio id="receiveSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
 
 <div class="header">
     <div class="header-right">
@@ -95,9 +92,9 @@ const storage = firebase.storage();
 
 let myName = localStorage.getItem("chatName") || "مستخدم";
 let isAdmin = false;
+let isInitialLoad = true; // لمنع تشغيل الصوت عند فتح الصفحة لأول مرة
 document.getElementById("userLabel").innerText = myName;
 
-// وضع الشبح (المسؤول)
 function enterAdmin() {
     let p = prompt("كلمة سر الشبح:");
     if(p === "123") {
@@ -125,6 +122,8 @@ db.collection("chat").orderBy("time").onSnapshot(snap => {
     const chatBox = document.getElementById("chat");
     chatBox.innerHTML = "";
     const hidden = JSON.parse(localStorage.getItem("hidden_msgs") || "[]");
+    
+    let lastDoc = snap.docChanges().slice(-1)[0];
 
     snap.forEach(doc => {
         allIds.add(doc.id);
@@ -135,7 +134,6 @@ db.collection("chat").orderBy("time").onSnapshot(snap => {
         const side = isMe ? "me" : "other";
         const t = new Date(d.time).toLocaleTimeString("ar-BH", {hour:'2-digit', minute:'2-digit'});
         
-        // تحديث الصحين
         if(!isMe && (!d.readBy || !d.readBy.includes(myName))) {
             db.collection("chat").doc(doc.id).update({ readBy: firebase.firestore.FieldValue.arrayUnion(myName) });
         }
@@ -149,7 +147,6 @@ db.collection("chat").orderBy("time").onSnapshot(snap => {
             <div>${d.text || ""} ${d.edited ? '<small style="color:#888">(معدلة)</small>' : ''}</div>
             ${d.img ? `<img src="${d.img}" class="msg-img">` : ""}
             <div class="time">${t} ${ticks}</div>
-            
             <div class="msg-tools">
                 ${(isMe || isAdmin) ? `<button class="tool-btn" onclick="editNow('${doc.id}', '${d.text}')">تعديل</button>` : ""}
                 ${(isMe) ? `<button class="tool-btn" onclick="delForAll('${doc.id}')" style="color:red">حذف للكل</button>` : ""}
@@ -157,6 +154,19 @@ db.collection("chat").orderBy("time").onSnapshot(snap => {
             </div>
         </div>`;
     });
+
+    // نظام تشغيل أصوات الإشعارات
+    if (!isInitialLoad && snap.docChanges().length > 0) {
+        snap.docChanges().forEach(change => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                if (data.name !== myName) {
+                    document.getElementById("receiveSound").play().catch(e => {});
+                }
+            }
+        });
+    }
+    isInitialLoad = false;
     chatBox.scrollTop = chatBox.scrollHeight;
 });
 
@@ -164,6 +174,7 @@ function sendMsg() {
     const input = document.getElementById("msgInput");
     if(!input.value.trim()) return;
     db.collection("chat").add({ name: myName, text: input.value, time: Date.now(), readBy: [] });
+    document.getElementById("sendSound").play().catch(e => {}); // صوت الإرسال
     input.value = "";
     document.getElementById("emojiPanel").style.display = "none";
 }
@@ -193,6 +204,7 @@ imgUpload.onchange = (e) => {
     const ref = storage.ref("imgs/" + Date.now());
     ref.put(file).then(() => ref.getDownloadURL().then(url => {
         db.collection("chat").add({ name: myName, img: url, time: Date.now(), readBy: [] });
+        document.getElementById("sendSound").play().catch(e => {});
     }));
 };
 </script>
